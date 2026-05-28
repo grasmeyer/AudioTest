@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		D2E6C2D42FC84F3100FF235F /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = D2E6C2D32FC84F3100FF235F /* AudioKit */; };
+		D2E6C2D72FC8550900FF235F /* CSoundpipeAudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = D2E6C2D62FC8550900FF235F /* CSoundpipeAudioKit */; };
+		D2E6C2D92FC8550900FF235F /* SoundpipeAudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = D2E6C2D82FC8550900FF235F /* SoundpipeAudioKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,7 +29,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D2E6C2D72FC8550900FF235F /* CSoundpipeAudioKit in Frameworks */,
 				D2E6C2D42FC84F3100FF235F /* AudioKit in Frameworks */,
+				D2E6C2D92FC8550900FF235F /* SoundpipeAudioKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +75,8 @@
 			name = AudioTest;
 			packageProductDependencies = (
 				D2E6C2D32FC84F3100FF235F /* AudioKit */,
+				D2E6C2D62FC8550900FF235F /* CSoundpipeAudioKit */,
+				D2E6C2D82FC8550900FF235F /* SoundpipeAudioKit */,
 			);
 			productName = AudioTest;
 			productReference = D2E6C2C02FC849A500FF235F /* AudioTest.app */;
@@ -102,6 +108,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D2E6C2D22FC84F3100FF235F /* XCRemoteSwiftPackageReference "AudioKit" */,
+				D2E6C2D52FC8550900FF235F /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D2E6C2C12FC849A500FF235F /* Products */;
@@ -351,6 +358,14 @@
 				minimumVersion = 5.6.0;
 			};
 		};
+		D2E6C2D52FC8550900FF235F /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AudioKit/SoundpipeAudioKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -358,6 +373,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D2E6C2D22FC84F3100FF235F /* XCRemoteSwiftPackageReference "AudioKit" */;
 			productName = AudioKit;
+		};
+		D2E6C2D62FC8550900FF235F /* CSoundpipeAudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D2E6C2D52FC8550900FF235F /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */;
+			productName = CSoundpipeAudioKit;
+		};
+		D2E6C2D82FC8550900FF235F /* SoundpipeAudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D2E6C2D52FC8550900FF235F /* XCRemoteSwiftPackageReference "SoundpipeAudioKit" */;
+			productName = SoundpipeAudioKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
