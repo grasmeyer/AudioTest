@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D2E6C2D42FC84F3100FF235F /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = D2E6C2D32FC84F3100FF235F /* AudioKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		D2E6C2C02FC849A500FF235F /* AudioTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudioTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D2E6C2D42FC84F3100FF235F /* AudioKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = AudioTest;
 			packageProductDependencies = (
+				D2E6C2D32FC84F3100FF235F /* AudioKit */,
 			);
 			productName = AudioTest;
 			productReference = D2E6C2C02FC849A500FF235F /* AudioTest.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = D2E6C2B72FC849A500FF235F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D2E6C2D22FC84F3100FF235F /* XCRemoteSwiftPackageReference "AudioKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D2E6C2C12FC849A500FF235F /* Products */;
 			projectDirPath = "";
@@ -332,6 +341,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D2E6C2D22FC84F3100FF235F /* XCRemoteSwiftPackageReference "AudioKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AudioKit/AudioKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D2E6C2D32FC84F3100FF235F /* AudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D2E6C2D22FC84F3100FF235F /* XCRemoteSwiftPackageReference "AudioKit" */;
+			productName = AudioKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D2E6C2B82FC849A500FF235F /* Project object */;
 }
