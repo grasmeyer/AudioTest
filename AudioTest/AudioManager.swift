@@ -122,33 +122,41 @@ final class AudioManager {
             }
             pitch.start()
             pitchTap = pitch
-
-            player.play()
-            isPlaying = true
         } catch {
             errorMessage = "Audio setup error: \(error.localizedDescription)"
         }
     }
 
+    func start() {
+        guard !isPlaying else { return }
+        player.play()
+        isPlaying = true
+    }
+
+    func stop() {
+        guard isPlaying else { return }
+        player.stop()
+        bass = 0
+        mid = 0
+        treble = 0
+        amplitude = 0
+        leftAmplitude = 0
+        rightAmplitude = 0
+        pitchValue = 0
+        pitchFrequency = 0
+        brightness = 0
+        centroidHz = 0
+        beatPulse = 0
+        waveform = Array(repeating: 0, count: waveformPoints)
+        isPlaying = false
+    }
+
     func togglePlay() {
         if isPlaying {
-            player.stop()
-            bass = 0
-            mid = 0
-            treble = 0
-            amplitude = 0
-            leftAmplitude = 0
-            rightAmplitude = 0
-            pitchValue = 0
-            pitchFrequency = 0
-            brightness = 0
-            centroidHz = 0
-            beatPulse = 0
-            waveform = Array(repeating: 0, count: waveformPoints)
+            stop()
         } else {
-            player.play()
+            start()
         }
-        isPlaying.toggle()
     }
 
     private func processStereoAmplitude(left: Float, right: Float) {

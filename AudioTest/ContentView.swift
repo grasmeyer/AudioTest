@@ -102,6 +102,12 @@ struct ContentView: View {
                 .padding(.bottom, 12)
             }
         }
+        .navigationTitle("Audio Meters")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { audio.start() }
+        .onDisappear { audio.stop() }
     }
 }
 
