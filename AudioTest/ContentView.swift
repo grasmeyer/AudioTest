@@ -43,10 +43,19 @@ struct ContentView: View {
 
                 Spacer()
 
-                VStack(spacing: 22) {
+                VStack(spacing: 16) {
                     FrequencyBar(label: "Bass", value: audio.bass, color: .pink)
                     FrequencyBar(label: "Mid", value: audio.mid, color: .mint)
                     FrequencyBar(label: "Treble", value: audio.treble, color: .cyan)
+                    FrequencyBar(label: "Volume (RMS)", value: audio.amplitude, color: .yellow)
+                    FrequencyBar(
+                        label: "Pitch",
+                        value: audio.pitchValue,
+                        color: .purple,
+                        trailingText: audio.pitchFrequency > 0
+                            ? String(format: "%.0f Hz", audio.pitchFrequency)
+                            : nil
+                    )
                 }
                 .padding(.horizontal, 24)
 
@@ -81,32 +90,42 @@ struct FrequencyBar: View {
     let label: String
     let value: Float
     let color: Color
+    var trailingText: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(label)
-                    .font(.headline)
+                    .font(.subheadline.bold())
                     .foregroundStyle(.white)
                 Spacer()
-                Text(String(format: "%.2f", value))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.7))
+                if let trailingText {
+                    Text(trailingText)
+                        .font(.caption.monospacedDigit().bold())
+                        .foregroundStyle(.white)
+                    Text(String(format: "%.2f", value))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.6))
+                } else {
+                    Text(String(format: "%.2f", value))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.7))
+                }
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(.white.opacity(0.10))
 
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(color.gradient)
                         .frame(width: geo.size.width * CGFloat(min(max(value, 0), 1)))
-                        .shadow(color: color.opacity(0.8), radius: 12)
+                        .shadow(color: color.opacity(0.8), radius: 10)
                         .animation(.easeOut(duration: 0.08), value: value)
                 }
             }
-            .frame(height: 44)
+            .frame(height: 32)
         }
     }
 }
