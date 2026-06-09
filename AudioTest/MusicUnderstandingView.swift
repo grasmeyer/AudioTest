@@ -54,15 +54,35 @@ final class MusicUnderstandingManager {
     var bassActivity: Float = 0
     var otherActivity: Float = 0
 
+    // Live playback levels, sampled from the analyzed data at the current play head.
+    var isPlaying: Bool = false
+    var liveLoudnessValue: Float = 0
+    var liveLoudnessLUFS: Float?
+    var liveVocal: Float = 0
+    var liveDrum: Float = 0
+    var liveBass: Float = 0
+    var liveOther: Float = 0
+
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var audioPlayer: AVAudioPlayer?
+    @ObservationIgnored private var playbackTask: Task<Void, Never>?
+
+    // Time-stamped analysis data (seconds, value) used to drive the live meters.
+    @ObservationIgnored private var loudnessSamples: [(time: Double, value: Float)] = []
+    @ObservationIgnored private var vocalSamples: [(time: Double, value: Float)] = []
+    @ObservationIgnored private var drumSamples: [(time: Double, value: Float)] = []
+    @ObservationIgnored private var bassSamples: [(time: Double, value: Float)] = []
+    @ObservationIgnored private var otherSamples: [(time: Double, value: Float)] = []
+
+    private let audioURL = Bundle.main.url(
+        forResource: "melodic-rampb-soul-394784",
+        withExtension: "mp3"
+    )
 
     func analyze() {
         guard status != .analyzing else { return }
 
-        guard let url = Bundle.main.url(
-            forResource: "melodic-rampb-soul-394784",
-            withExtension: "mp3"
-        ) else {
+        guard let url = audioURL else {
             status = .failed("Audio file not found in bundle")
             return
         }
@@ -87,6 +107,90 @@ final class MusicUnderstandingManager {
     func cancel() {
         task?.cancel()
         task = nil
+        stopPlayback()
+    }
+
+    // MARK: - Playback
+
+    func togglePlayback() {
+        if isPlaying {
+            stopPlayback()
+        } else {
+            startPlayback()
+        }
+    }
+
+    func startPlayback() {
+        guard status == .finished, let url = audioURL else { return }
+        do {
+            if audioPlayer == nil {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+                try AVAudioSession.sharedInstance().setActive(true)
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.numberOfLoops = -1
+                player.prepareToPlay()
+                audioPlayer = player
+            }
+            audioPlayer?.play()
+            isPlaying = true
+            startLiveUpdates()
+        } catch {
+            status = .failed("Playback error: \(error.localizedDescription)")
+        }
+    }
+
+    func stopPlayback() {
+        audioPlayer?.pause()
+        audioPlayer?.currentTime = 0
+        isPlaying = false
+        playbackTask?.cancel()
+        playbackTask = nil
+        liveLoudnessValue = 0
+        liveLoudnessLUFS = nil
+        liveVocal = 0
+        liveDrum = 0
+        liveBass = 0
+        liveOther = 0
+    }
+
+    private func startLiveUpdates() {
+        playbackTask?.cancel()
+        playbackTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, let player = self.audioPlayer, player.isPlaying else { break }
+                self.updateLiveValues(at: player.currentTime)
+                try? await Task.sleep(for: .milliseconds(33))
+            }
+        }
+    }
+
+    private func updateLiveValues(at time: Double) {
+        if let lufs = Self.value(in: loudnessSamples, at: time) {
+            liveLoudnessLUFS = lufs
+            liveLoudnessValue = Self.normalize(lufs, min: -40, max: 0)
+        }
+        liveVocal = Self.value(in: vocalSamples, at: time) ?? 0
+        liveDrum = Self.value(in: drumSamples, at: time) ?? 0
+        liveBass = Self.value(in: bassSamples, at: time) ?? 0
+        liveOther = Self.value(in: otherSamples, at: time) ?? 0
+    }
+
+    /// Returns the value of the most recent sample at or before `time` (samples are sorted by time).
+    private static func value(in samples: [(time: Double, value: Float)], at time: Double) -> Float? {
+        guard !samples.isEmpty else { return nil }
+        var low = 0
+        var high = samples.count - 1
+        var index = 0
+        while low <= high {
+            let mid = (low + high) / 2
+            if samples[mid].time <= time {
+                index = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return samples[index].value
     }
 
     private func apply(_ result: MusicUnderstandingSession.SessionResult) {
@@ -106,6 +210,8 @@ final class MusicUnderstandingManager {
             peakDB = loudness.peak.value
             // LUFS is negative; map a typical -40...0 range onto 0...1 for the bar.
             loudnessValue = Self.normalize(loudness.integrated.value, min: -40, max: 0)
+            // Momentary loudness drives the live meter during playback.
+            loudnessSamples = loudness.momentary.map { (CMTimeGetSeconds($0.time), $0.value) }
         }
 
         if let pace = result.pace, !pace.ranges.isEmpty {
@@ -129,6 +235,11 @@ final class MusicUnderstandingManager {
             drumActivity = Self.averageActivity(instruments, .drum)
             bassActivity = Self.averageActivity(instruments, .bass)
             otherActivity = Self.averageActivity(instruments, .other)
+            // Per-instrument activity over time drives the live meters during playback.
+            vocalSamples = Self.timedSamples(instruments, .vocal)
+            drumSamples = Self.timedSamples(instruments, .drum)
+            bassSamples = Self.timedSamples(instruments, .bass)
+            otherSamples = Self.timedSamples(instruments, .other)
         }
     }
 
@@ -139,6 +250,13 @@ final class MusicUnderstandingManager {
         guard let samples = result.activity[instrument], !samples.isEmpty else { return 0 }
         let sum = samples.reduce(Float(0)) { $0 + $1.value }
         return min(max(sum / Float(samples.count), 0), 1)
+    }
+
+    private static func timedSamples(
+        _ result: InstrumentActivityResult,
+        _ instrument: InstrumentActivityResult.Instrument
+    ) -> [(time: Double, value: Float)] {
+        (result.activity[instrument] ?? []).map { (CMTimeGetSeconds($0.time), $0.value) }
     }
 
     private static func normalize(_ value: Float, min lower: Float, max upper: Float) -> Float {
@@ -210,28 +328,38 @@ struct MusicUnderstandingView: View {
 
                 Spacer(minLength: 0)
 
-                Button(action: runAnalysis) {
-                    HStack(spacing: 12) {
-                        Image(systemName: analyzer.status == .analyzing ? "hourglass" : "waveform.badge.magnifyingglass")
-                            .font(.system(size: 24, weight: .bold))
-                        Text(buttonTitle)
-                            .font(.title3.bold())
+                if analyzer.status == .finished {
+                    Button(action: analyzer.togglePlayback) {
+                        capsuleLabel(
+                            icon: analyzer.isPlaying ? "stop.fill" : "play.fill",
+                            title: analyzer.isPlaying ? "Stop" : "Play",
+                            color: analyzer.isPlaying ? .red : .green
+                        )
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        Capsule()
-                            .fill(Color.purple.opacity(0.8))
-                            .overlay(Capsule().stroke(.white.opacity(0.5), lineWidth: 1.5))
-                    )
-                    .shadow(color: Color.purple.opacity(0.5), radius: 14)
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 24)
+
+                    Button(action: runAnalysis) {
+                        Text("Re-Analyze")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 12)
+                } else {
+                    Button(action: runAnalysis) {
+                        capsuleLabel(
+                            icon: analyzer.status == .analyzing ? "hourglass" : "waveform.badge.magnifyingglass",
+                            title: buttonTitle,
+                            color: .purple
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(analyzer.status == .analyzing)
+                    .opacity(analyzer.status == .analyzing ? 0.6 : 1)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
                 }
-                .buttonStyle(.plain)
-                .disabled(analyzer.status == .analyzing)
-                .opacity(analyzer.status == .analyzing ? 0.6 : 1)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
             }
         }
         .navigationTitle("Music Understanding")
@@ -256,6 +384,24 @@ struct MusicUnderstandingView: View {
         analyzer.cancel()
         analyzer.status = .idle
         analyzer.analyze()
+    }
+
+    private func capsuleLabel(icon: String, title: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .bold))
+            Text(title)
+                .font(.title3.bold())
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.8))
+                .overlay(Capsule().stroke(.white.opacity(0.5), lineWidth: 1.5))
+        )
+        .shadow(color: color.opacity(0.5), radius: 14)
     }
 
     private func placeholder(icon: String, message: String, tint: Color = .white) -> some View {
@@ -289,10 +435,11 @@ struct MusicUnderstandingView: View {
                 )
 
                 FrequencyBar(
-                    label: "Loudness",
-                    value: analyzer.loudnessValue,
+                    label: analyzer.isPlaying ? "Loudness (live)" : "Loudness (integrated)",
+                    value: analyzer.isPlaying ? analyzer.liveLoudnessValue : analyzer.loudnessValue,
                     color: .yellow,
-                    trailingText: analyzer.integratedLUFS.map { String(format: "%.1f LUFS", $0) }
+                    trailingText: (analyzer.isPlaying ? analyzer.liveLoudnessLUFS : analyzer.integratedLUFS)
+                        .map { String(format: "%.1f LUFS", $0) }
                 )
                 FrequencyBar(
                     label: "Pace (energy)",
@@ -301,16 +448,16 @@ struct MusicUnderstandingView: View {
                     trailingText: analyzer.averagePace.map { String(format: "%.0f epm", $0) }
                 )
 
-                Text("Instrument Activity")
+                Text(analyzer.isPlaying ? "Instrument Activity (live)" : "Instrument Activity (avg)")
                     .font(.subheadline.bold())
                     .foregroundStyle(.white.opacity(0.85))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 4)
 
-                FrequencyBar(label: "Vocals", value: analyzer.vocalActivity, color: .purple)
-                FrequencyBar(label: "Drums", value: analyzer.drumActivity, color: .red)
-                FrequencyBar(label: "Bass", value: analyzer.bassActivity, color: .blue)
-                FrequencyBar(label: "Other", value: analyzer.otherActivity, color: .green)
+                FrequencyBar(label: "Vocals", value: analyzer.isPlaying ? analyzer.liveVocal : analyzer.vocalActivity, color: .purple)
+                FrequencyBar(label: "Drums", value: analyzer.isPlaying ? analyzer.liveDrum : analyzer.drumActivity, color: .red)
+                FrequencyBar(label: "Bass", value: analyzer.isPlaying ? analyzer.liveBass : analyzer.bassActivity, color: .blue)
+                FrequencyBar(label: "Other", value: analyzer.isPlaying ? analyzer.liveOther : analyzer.otherActivity, color: .green)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
