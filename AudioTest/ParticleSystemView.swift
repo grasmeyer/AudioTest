@@ -13,39 +13,60 @@ import Metal
 struct ParticleSystemView: View {
     @State private var audio = AudioManager()
     @State private var settings = ParticleSettings()
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    // On iPhone, landscape collapses the vertical size class to compact.
+    private var isLandscape: Bool { verticalSizeClass == .compact }
 
     var body: some View {
         GeometryReader { geo in
-            VStack(spacing: 0) {
-                // Top half: the live particle visual.
+            if isLandscape {
+                // Landscape: the visual takes over the whole screen and fills its width.
                 ZStack {
                     Color.black
-                    if isMetalAvailable {
-                        MetalParticleView(audio: audio, settings: settings)
-                    } else {
-                        ContentUnavailableView(
-                            "Metal Unavailable",
-                            systemImage: "exclamationmark.triangle",
-                            description: Text("This device can't run the particle system.")
-                        )
-                        .foregroundStyle(.white)
-                    }
+                    visual(aspectFill: true)
                 }
-                .frame(height: geo.size.height * 0.5)
-                .clipped()
-
-                // Bottom half: the control harness.
-                ParticleControlsView(settings: settings)
+                .frame(width: geo.size.width, height: geo.size.height)
+                .ignoresSafeArea()
+            } else {
+                // Portrait: top-half visual, bottom-half control harness.
+                VStack(spacing: 0) {
+                    ZStack {
+                        Color.black
+                        visual(aspectFill: false)
+                    }
                     .frame(height: geo.size.height * 0.5)
+                    .clipped()
+
+                    ParticleControlsView(settings: settings)
+                        .frame(height: geo.size.height * 0.5)
+                }
             }
         }
         .background(Color.black)
         .navigationTitle("Particle System")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isLandscape ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .statusBarHidden(isLandscape)
+        .ignoresSafeArea(edges: isLandscape ? .all : [])
         .onAppear { audio.start() }
         .onDisappear { audio.stop() }
+    }
+
+    @ViewBuilder
+    private func visual(aspectFill: Bool) -> some View {
+        if isMetalAvailable {
+            MetalParticleView(audio: audio, settings: settings, aspectFill: aspectFill)
+        } else {
+            ContentUnavailableView(
+                "Metal Unavailable",
+                systemImage: "exclamationmark.triangle",
+                description: Text("This device can't run the particle system.")
+            )
+            .foregroundStyle(.white)
+        }
     }
 
     private var isMetalAvailable: Bool {

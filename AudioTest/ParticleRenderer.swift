@@ -53,6 +53,7 @@ final class ParticleRenderer: NSObject, MTKViewDelegate {
     private let particleCount: Int
     private let audio: AudioManager
     private let settings: ParticleSettings
+    private let aspectFill: Bool
 
     private var time: Float = 0
     private var frameSeed: UInt32 = 0
@@ -60,7 +61,7 @@ final class ParticleRenderer: NSObject, MTKViewDelegate {
     private var scaleX: Float = 1
     private var scaleY: Float = 1
 
-    init?(audio: AudioManager, settings: ParticleSettings, particleCount: Int = 130_000) {
+    init?(audio: AudioManager, settings: ParticleSettings, aspectFill: Bool = false, particleCount: Int = 130_000) {
         guard let device = MTLCreateSystemDefaultDevice(),
               let queue = device.makeCommandQueue(),
               let library = device.makeDefaultLibrary(),
@@ -75,6 +76,7 @@ final class ParticleRenderer: NSObject, MTKViewDelegate {
         self.commandQueue = queue
         self.audio = audio
         self.settings = settings
+        self.aspectFill = aspectFill
         self.particleCount = particleCount
 
         do {
@@ -132,13 +134,25 @@ final class ParticleRenderer: NSObject, MTKViewDelegate {
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        // Fit the square simulation region into the view, centered.
         let w = Float(size.width)
         let h = Float(size.height)
         guard w > 0, h > 0 else { return }
-        let m = min(w, h)
-        scaleX = m / w
-        scaleY = m / h
+        if aspectFill {
+            // Cover the view with the square simulation, keeping it undistorted:
+            // fill the larger dimension and let the smaller one overflow off-screen.
+            if w >= h {
+                scaleX = 1
+                scaleY = w / h
+            } else {
+                scaleX = h / w
+                scaleY = 1
+            }
+        } else {
+            // Fit the square simulation region into the view, centered.
+            let m = min(w, h)
+            scaleX = m / w
+            scaleY = m / h
+        }
     }
 
     func draw(in view: MTKView) {
@@ -221,9 +235,10 @@ final class ParticleRenderer: NSObject, MTKViewDelegate {
 struct MetalParticleView: UIViewRepresentable {
     var audio: AudioManager
     var settings: ParticleSettings
+    var aspectFill: Bool = false
 
     func makeCoordinator() -> ParticleRenderer? {
-        ParticleRenderer(audio: audio, settings: settings)
+        ParticleRenderer(audio: audio, settings: settings, aspectFill: aspectFill)
     }
 
     func makeUIView(context: Context) -> MTKView {
