@@ -33,6 +33,12 @@ struct RootView: View {
                     Label("2D Shader", systemImage: "water.waves")
                 }
 
+                NavigationLink {
+                    SinebowView()
+                } label: {
+                    Label("Sinebow", systemImage: "rainbow")
+                }
+
                 if #available(iOS 27.0, *) {
                     NavigationLink {
                         MusicUnderstandingView()
