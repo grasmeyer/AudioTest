@@ -94,8 +94,9 @@ struct SinebowControlsView: View {
 
                     controlGroup("Waves") {
                         ParamSlider(label: "Wave Count", value: $settings.waveCount, range: 1...20)
-                        ParamSlider(label: "Strength Base", value: $settings.strengthBase, range: 0...40)
-                        ParamSlider(label: "Strength ← Bass", value: $settings.strengthBass, range: 0...60)
+                        ParamSlider(label: "Separation", value: $settings.separation, range: 0...0.3)
+                        ParamSlider(label: "Strength Base", value: $settings.strengthBase, range: 0...200)
+                        ParamSlider(label: "Strength ← Bass", value: $settings.strengthBass, range: 0...200)
                     }
 
                     controlGroup("Motion") {

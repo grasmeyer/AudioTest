@@ -19,6 +19,8 @@ struct SinebowUniforms {
     var thickness: Float
     var brightness: Float
     var hueShift: Float
+    var separation: Float
+    var waveformCount: Float
     var resolution: SIMD2<Float>
 }
 
@@ -28,6 +30,10 @@ final class SinebowRenderer: NSObject, MTKViewDelegate {
     private let pipeline: MTLRenderPipelineState
     private let audio: AudioManager
     private let settings: SinebowSettings
+
+    // Live music waveform resampled to a fixed length for the shader.
+    private let waveformCount = 256
+    private let waveformBuffer: MTLBuffer
 
     private var phase: Float = 0
     private var lastTimestamp: CFTimeInterval = CACurrentMediaTime()
@@ -63,7 +69,33 @@ final class SinebowRenderer: NSObject, MTKViewDelegate {
             return nil
         }
 
+        guard let buffer = device.makeBuffer(
+            length: MemoryLayout<Float>.stride * waveformCount,
+            options: .storageModeShared
+        ) else {
+            return nil
+        }
+        waveformBuffer = buffer
+
         super.init()
+    }
+
+    // Resample the audio manager's waveform block to the fixed buffer length.
+    private func updateWaveformBuffer() {
+        let samples = audio.waveform
+        let ptr = waveformBuffer.contents().bindMemory(to: Float.self, capacity: waveformCount)
+        guard samples.count > 1 else {
+            for i in 0..<waveformCount { ptr[i] = 0 }
+            return
+        }
+        let lastIndex = Float(samples.count - 1)
+        for i in 0..<waveformCount {
+            let pos = Float(i) / Float(waveformCount - 1) * lastIndex
+            let i0 = Int(pos)
+            let i1 = min(i0 + 1, samples.count - 1)
+            let t = pos - Float(i0)
+            ptr[i] = samples[i0] * (1 - t) + samples[i1] * t
+        }
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
@@ -94,6 +126,8 @@ final class SinebowRenderer: NSObject, MTKViewDelegate {
         centroidSmoothed = centroidSmoothed * 0.95 + centroid * 0.05
         phase += dt * (settings.speedBase + rms * settings.speedRMS)
 
+        updateWaveformBuffer()
+
         var uniforms = SinebowUniforms(
             time: phase,
             waveCount: settings.waveCount,
@@ -101,12 +135,15 @@ final class SinebowRenderer: NSObject, MTKViewDelegate {
             thickness: settings.thickness,
             brightness: settings.brightness,
             hueShift: settings.hueOffset + centroidSmoothed * settings.hueCentroid,
+            separation: settings.separation,
+            waveformCount: Float(waveformCount),
             resolution: resolution
         )
 
         if let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor) {
             encoder.setRenderPipelineState(pipeline)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SinebowUniforms>.stride, index: 0)
+            encoder.setFragmentBuffer(waveformBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
             encoder.endEncoding()
         }

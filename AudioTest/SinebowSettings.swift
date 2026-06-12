@@ -13,8 +13,9 @@ import Observation
 final class SinebowSettings {
     // Waves.
     var waveCount: Float = 8        // number of stacked waves
-    var strengthBase: Float = 15    // baseline wave displacement
-    var strengthBass: Float = 25    // added displacement per unit bass
+    var separation: Float = 0.05    // horizontal offset between stacked waves
+    var strengthBase: Float = 60    // baseline waveform displacement
+    var strengthBass: Float = 80    // added displacement per unit bass
 
     // Motion.
     var speedBase: Float = 0.8      // baseline animation speed
@@ -28,8 +29,9 @@ final class SinebowSettings {
 
     func reset() {
         waveCount = 8
-        strengthBase = 15
-        strengthBass = 25
+        separation = 0.05
+        strengthBase = 60
+        strengthBass = 80
         speedBase = 0.8
         speedRMS = 3.0
         thickness = 100
