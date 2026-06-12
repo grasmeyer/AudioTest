@@ -21,6 +21,12 @@ struct RootView: View {
                     Label("Pulsing Shapes", systemImage: "circle.circle")
                 }
 
+                NavigationLink {
+                    ParticleSystemView()
+                } label: {
+                    Label("Particle System", systemImage: "sparkles")
+                }
+
                 if #available(iOS 27.0, *) {
                     NavigationLink {
                         MusicUnderstandingView()
