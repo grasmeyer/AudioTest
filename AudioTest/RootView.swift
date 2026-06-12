@@ -27,6 +27,12 @@ struct RootView: View {
                     Label("Particle System", systemImage: "sparkles")
                 }
 
+                NavigationLink {
+                    ShaderSceneView()
+                } label: {
+                    Label("2D Shader", systemImage: "water.waves")
+                }
+
                 if #available(iOS 27.0, *) {
                     NavigationLink {
                         MusicUnderstandingView()
