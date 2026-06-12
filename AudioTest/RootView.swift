@@ -15,6 +15,12 @@ struct RootView: View {
                     Label("AudioKit Test", systemImage: "waveform")
                 }
 
+                NavigationLink {
+                    PulsingShapesView()
+                } label: {
+                    Label("Pulsing Shapes", systemImage: "circle.circle")
+                }
+
                 if #available(iOS 27.0, *) {
                     NavigationLink {
                         MusicUnderstandingView()

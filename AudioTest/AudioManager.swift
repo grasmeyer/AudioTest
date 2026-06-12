@@ -37,6 +37,12 @@ final class AudioManager {
     var centroidHz: Float = 0
     var beatPulse: Float = 0
     var waveform: [Float] = Array(repeating: 0, count: 96)
+    // Log-binned magnitude spectrum (current column), 0...1 per band.
+    var spectrum: [Float] = Array(repeating: 0, count: 48)
+    // Rolling history of spectrum columns for the scrolling spectrogram (oldest first).
+    var spectrogram: [[Float]] = []
+    // Rolling buffer of recent raw samples for the scrolling waveform tape.
+    var scrollingWaveform: [Float] = []
     var isPlaying: Bool = false
     var errorMessage: String?
 
@@ -45,6 +51,12 @@ final class AudioManager {
     private let smoothing: Float = 0.55
     private let pitchSmoothing: Float = 0.7
     private let waveformPoints: Int = 96
+
+    private let spectrumBands: Int = 48
+    private let spectrumMinHz: Float = 30
+    private let spectrumMaxHz: Float = 16_000
+    private let spectrogramColumns: Int = 120
+    private let scrollingWaveformSamples: Int = 900
 
     private let pitchMinHz: Float = 80
     private let pitchMaxHz: Float = 1_200
@@ -148,6 +160,9 @@ final class AudioManager {
         centroidHz = 0
         beatPulse = 0
         waveform = Array(repeating: 0, count: waveformPoints)
+        spectrum = Array(repeating: 0, count: spectrumBands)
+        spectrogram = []
+        scrollingWaveform = []
         isPlaying = false
     }
 
@@ -192,6 +207,14 @@ final class AudioManager {
             sampled.append(data[idx])
         }
         waveform = sampled
+
+        // Append this block to the scrolling-waveform tape and trim to the window.
+        var tape = scrollingWaveform
+        tape.append(contentsOf: sampled)
+        if tape.count > scrollingWaveformSamples {
+            tape.removeFirst(tape.count - scrollingWaveformSamples)
+        }
+        scrollingWaveform = tape
     }
 
     private func process(fftData: [Float]) {
@@ -217,6 +240,35 @@ final class AudioManager {
         bass = bass * smoothing + bassLevel * (1 - smoothing)
         mid = mid * smoothing + midLevel * (1 - smoothing)
         treble = treble * smoothing + trebleLevel * (1 - smoothing)
+
+        // Log-binned spectrum for the spectrogram / debug views.
+        let logMin = log2(spectrumMinHz)
+        let logMax = log2(spectrumMaxHz)
+        var column = spectrum
+        for b in 0..<spectrumBands {
+            let f0 = pow(2, logMin + (logMax - logMin) * Float(b) / Float(spectrumBands))
+            let f1 = pow(2, logMin + (logMax - logMin) * Float(b + 1) / Float(spectrumBands))
+            let startBin = max(1, Int(f0 / binWidth))
+            let endBin = min(binCount - 1, max(startBin + 1, Int(f1 / binWidth)))
+            var sum: Float = 0
+            for i in startBin..<endBin {
+                sum += sqrt(max(fftData[i], 0))
+            }
+            let avg = sum / Float(endBin - startBin)
+            // Higher bands carry less energy per bin, so ramp the gain with frequency.
+            let gain = 40 + 150 * Float(b) / Float(spectrumBands)
+            let level = min(avg * gain, 1)
+            // Lighter smoothing than the bands so the spectrogram stays responsive.
+            column[b] = column[b] * 0.4 + level * 0.6
+        }
+        spectrum = column
+
+        var history = spectrogram
+        history.append(column)
+        if history.count > spectrogramColumns {
+            history.removeFirst(history.count - spectrogramColumns)
+        }
+        spectrogram = history
 
         // Spectral centroid — magnitude-weighted average frequency, "brightness".
         var weighted: Float = 0
