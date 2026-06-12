@@ -115,6 +115,13 @@ struct ShaderControlsView: View {
                     controlGroup("Framing") {
                         ParamSlider(label: "Zoom", value: $settings.zoom, range: 0.5...6)
                     }
+
+                    if let url = URL(string: "https://thebookofshaders.com") {
+                        Link("The Book of Shaders", destination: url)
+                            .font(.subheadline)
+                            .foregroundStyle(.blue)
+                            .padding(.top, 8)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
