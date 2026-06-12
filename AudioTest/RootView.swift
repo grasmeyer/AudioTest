@@ -39,6 +39,12 @@ struct RootView: View {
                     Label("Sinebow", systemImage: "rainbow")
                 }
 
+                NavigationLink {
+                    RaymarchView()
+                } label: {
+                    Label("Raymarching", systemImage: "cube.transparent")
+                }
+
                 if #available(iOS 27.0, *) {
                     NavigationLink {
                         MusicUnderstandingView()
