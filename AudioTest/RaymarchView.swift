@@ -12,7 +12,7 @@ import SwiftUI
 import Metal
 
 struct RaymarchView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
     @State private var settings = RaymarchSettings()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -49,8 +49,6 @@ struct RaymarchView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .statusBarHidden(isLandscape)
         .ignoresSafeArea(edges: isLandscape ? .all : [])
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 
     @ViewBuilder
@@ -135,5 +133,6 @@ struct RaymarchControlsView: View {
 #Preview {
     NavigationStack {
         RaymarchView()
+            .environment(AudioManager())
     }
 }

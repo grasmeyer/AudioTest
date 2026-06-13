@@ -57,15 +57,6 @@ struct RootView: View {
                 } label: {
                     Label("Box Tunnel", systemImage: "square.stack.3d.forward.dottedline")
                 }
-
-                if #available(iOS 27.0, *) {
-                    NavigationLink {
-                        MusicUnderstandingView()
-                            .toolbar(.hidden, for: .tabBar)
-                    } label: {
-                        Label("MusicUnderstanding Test", systemImage: "waveform.badge.magnifyingglass")
-                    }
-                }
             }
             .navigationTitle("TrippyBeats")
         }

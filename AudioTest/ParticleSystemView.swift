@@ -11,7 +11,7 @@ import SwiftUI
 import Metal
 
 struct ParticleSystemView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
     @State private var settings = ParticleSettings()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -51,8 +51,6 @@ struct ParticleSystemView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .statusBarHidden(isLandscape)
         .ignoresSafeArea(edges: isLandscape ? .all : [])
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 
     @ViewBuilder
@@ -160,5 +158,6 @@ struct ParamSlider: View {
 #Preview {
     NavigationStack {
         ParticleSystemView()
+            .environment(AudioManager())
     }
 }

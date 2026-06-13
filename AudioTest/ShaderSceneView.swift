@@ -12,7 +12,7 @@ import SwiftUI
 import Metal
 
 struct ShaderSceneView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
     @State private var settings = ShaderSettings()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -52,8 +52,6 @@ struct ShaderSceneView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .statusBarHidden(isLandscape)
         .ignoresSafeArea(edges: isLandscape ? .all : [])
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 
     @ViewBuilder
@@ -145,5 +143,6 @@ struct ShaderControlsView: View {
 #Preview {
     NavigationStack {
         ShaderSceneView()
+            .environment(AudioManager())
     }
 }

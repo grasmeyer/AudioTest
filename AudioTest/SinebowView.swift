@@ -12,7 +12,7 @@ import SwiftUI
 import Metal
 
 struct SinebowView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
     @State private var settings = SinebowSettings()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -49,8 +49,6 @@ struct SinebowView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .statusBarHidden(isLandscape)
         .ignoresSafeArea(edges: isLandscape ? .all : [])
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 
     @ViewBuilder
@@ -140,5 +138,6 @@ struct SinebowControlsView: View {
 #Preview {
     NavigationStack {
         SinebowView()
+            .environment(AudioManager())
     }
 }

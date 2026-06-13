@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MusicTabView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
 
     var body: some View {
         NavigationStack {
@@ -51,6 +51,28 @@ struct MusicTabView: View {
                         .shadow(color: (audio.isPlaying ? Color.red : Color.green).opacity(0.5), radius: 14)
                     }
                     .buttonStyle(.plain)
+
+                    if #available(iOS 27.0, *) {
+                        NavigationLink {
+                            MusicUnderstandingView()
+                                .toolbar(.hidden, for: .tabBar)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "waveform.badge.magnifyingglass")
+                                Text("Music Understanding")
+                            }
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: 240)
+                            .padding(.vertical, 12)
+                            .background(
+                                Capsule()
+                                    .fill(.white.opacity(0.12))
+                                    .overlay(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding()
             }
@@ -61,4 +83,5 @@ struct MusicTabView: View {
 
 #Preview {
     MusicTabView()
+        .environment(AudioManager())
 }

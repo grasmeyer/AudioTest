@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
 
     var body: some View {
         ZStack {
@@ -78,36 +78,13 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 24)
 
-                Spacer(minLength: 0)
-
-                Button(action: audio.togglePlay) {
-                    HStack(spacing: 12) {
-                        Image(systemName: audio.isPlaying ? "stop.fill" : "play.fill")
-                            .font(.system(size: 26, weight: .bold))
-                        Text(audio.isPlaying ? "Stop" : "Play")
-                            .font(.title3.bold())
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        Capsule()
-                            .fill(audio.isPlaying ? Color.red.opacity(0.8) : Color.green.opacity(0.8))
-                            .overlay(Capsule().stroke(.white.opacity(0.5), lineWidth: 1.5))
-                    )
-                    .shadow(color: (audio.isPlaying ? Color.red : Color.green).opacity(0.5), radius: 14)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
+                Spacer(minLength: 12)
             }
         }
         .navigationTitle("Audio Meters")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 }
 
@@ -245,4 +222,5 @@ struct FrequencyBar: View {
 
 #Preview {
     ContentView()
+        .environment(AudioManager())
 }

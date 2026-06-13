@@ -13,7 +13,7 @@ import SwiftUI
 import Metal
 
 struct TunnelView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
     @State private var settings = TunnelSettings()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -50,8 +50,6 @@ struct TunnelView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .statusBarHidden(isLandscape)
         .ignoresSafeArea(edges: isLandscape ? .all : [])
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 
     @ViewBuilder
@@ -144,5 +142,6 @@ struct TunnelControlsView: View {
 #Preview {
     NavigationStack {
         TunnelView()
+            .environment(AudioManager())
     }
 }

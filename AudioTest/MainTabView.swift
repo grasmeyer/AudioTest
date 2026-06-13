@@ -10,6 +10,10 @@
 import SwiftUI
 
 struct MainTabView: View {
+    // Single shared audio engine for the whole app; playback is controlled
+    // from the Music tab and every visual reads its analysis values.
+    @State private var audio = AudioManager()
+
     var body: some View {
         TabView {
             MusicTabView()
@@ -22,6 +26,7 @@ struct MainTabView: View {
                     Label("Visuals", systemImage: "sparkles")
                 }
         }
+        .environment(audio)
     }
 }
 

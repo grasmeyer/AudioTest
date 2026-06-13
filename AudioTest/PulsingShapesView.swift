@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct PulsingShapesView: View {
-    @State private var audio = AudioManager()
+    @Environment(AudioManager.self) private var audio
 
     var body: some View {
         GeometryReader { geo in
@@ -63,8 +63,6 @@ struct PulsingShapesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onAppear { audio.start() }
-        .onDisappear { audio.stop() }
     }
 }
 
@@ -186,5 +184,6 @@ struct WaveformStrip: View {
 #Preview {
     NavigationStack {
         PulsingShapesView()
+            .environment(AudioManager())
     }
 }
