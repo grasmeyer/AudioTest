@@ -7,13 +7,19 @@ import AudioKit
 import SoundpipeAudioKit
 import AVFoundation
 import Foundation
+import MediaPlayer
 import Observation
 
 @MainActor
 @Observable
 final class AudioManager {
+    // Which engine is currently driving playback.
+    enum Source { case engine, system }
+
     @ObservationIgnored private let engine = AudioEngine()
     @ObservationIgnored private let player = AudioPlayer()
+    @ObservationIgnored private let systemPlayer = MPMusicPlayerController.applicationMusicPlayer
+    @ObservationIgnored private var source: Source = .engine
     @ObservationIgnored private let waveformMixer: Mixer
     @ObservationIgnored private let mixer: Mixer
     @ObservationIgnored private let pitchMixer: Mixer
@@ -45,6 +51,11 @@ final class AudioManager {
     var scrollingWaveform: [Float] = []
     var isPlaying: Bool = false
     var errorMessage: String?
+    // Title of the current track shown in the Music tab.
+    var nowPlayingTitle: String = "Default Song"
+    // False when the current track plays through the system music player
+    // (DRM Apple Music streaming), which AudioKit cannot tap — visuals stay idle.
+    var isReactive: Bool = true
 
     private let bufferSize: UInt32 = 4096
     private let waveformBufferSize: UInt32 = 1024
@@ -141,13 +152,65 @@ final class AudioManager {
 
     func start() {
         guard !isPlaying else { return }
-        player.play()
+        switch source {
+        case .engine: player.play()
+        case .system: systemPlayer.play()
+        }
         isPlaying = true
     }
 
     func stop() {
         guard isPlaying else { return }
+        switch source {
+        case .engine: player.stop()
+        case .system: systemPlayer.pause()
+        }
+        clearAnalysis()
+        isPlaying = false
+    }
+
+    func togglePlay() {
+        if isPlaying {
+            stop()
+        } else {
+            start()
+        }
+    }
+
+    /// Play a song chosen from the Apple Music / library picker. If the item has
+    /// accessible audio (downloaded/local/non-DRM), it plays through AudioKit so
+    /// the visualizers react; otherwise it falls back to the system music player.
+    func play(mediaItem item: MPMediaItem) {
+        nowPlayingTitle = item.title ?? "Unknown Track"
+
+        // Stop whatever is currently playing on either engine.
         player.stop()
+        systemPlayer.stop()
+        clearAnalysis()
+
+        if let url = item.assetURL {
+            do {
+                try player.load(url: url)
+                player.isLooping = false
+                player.play()
+                source = .engine
+                isReactive = true
+                isPlaying = true
+            } catch {
+                errorMessage = "Couldn't load track: \(error.localizedDescription)"
+                isPlaying = false
+            }
+        } else {
+            // DRM-protected Apple Music stream: no audio taps available.
+            systemPlayer.setQueue(with: MPMediaItemCollection(items: [item]))
+            systemPlayer.play()
+            source = .system
+            isReactive = false
+            isPlaying = true
+        }
+    }
+
+    private func clearAnalysis() {
         bass = 0
         mid = 0
         treble = 0
@@ -163,15 +226,6 @@ final class AudioManager {
         spectrum = Array(repeating: 0, count: spectrumBands)
         spectrogram = []
         scrollingWaveform = []
-        isPlaying = false
-    }
-
-    func togglePlay() {
-        if isPlaying {
-            stop()
-        } else {
-            start()
-        }
     }
 
     private func processStereoAmplitude(left: Float, right: Float) {
