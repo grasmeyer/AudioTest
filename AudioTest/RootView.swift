@@ -45,6 +45,12 @@ struct RootView: View {
                     Label("Raymarching", systemImage: "cube.transparent")
                 }
 
+                NavigationLink {
+                    TunnelView()
+                } label: {
+                    Label("Box Tunnel", systemImage: "square.stack.3d.forward.dottedline")
+                }
+
                 if #available(iOS 27.0, *) {
                     NavigationLink {
                         MusicUnderstandingView()
