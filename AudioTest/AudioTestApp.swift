@@ -11,7 +11,7 @@ import SwiftUI
 struct AudioTestApp: App {
     var body: some Scene {
         WindowGroup {
-            RootView()
+            MainTabView()
         }
     }
 }
