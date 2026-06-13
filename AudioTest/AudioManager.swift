@@ -20,6 +20,7 @@ final class AudioManager {
     @ObservationIgnored private let player = AudioPlayer()
     @ObservationIgnored private let systemPlayer = MPMusicPlayerController.applicationMusicPlayer
     @ObservationIgnored private var source: Source = .engine
+    @ObservationIgnored private var lastExportURL: URL?
     @ObservationIgnored private let waveformMixer: Mixer
     @ObservationIgnored private let mixer: Mixer
     @ObservationIgnored private let pitchMixer: Mixer
@@ -56,6 +57,8 @@ final class AudioManager {
     // False when the current track plays through the system music player
     // (DRM Apple Music streaming), which AudioKit cannot tap — visuals stay idle.
     var isReactive: Bool = true
+    // True while a picked track is being exported for AudioKit playback.
+    var isPreparing: Bool = false
 
     private let bufferSize: UInt32 = 4096
     private let waveformBufferSize: UInt32 = 1024
@@ -182,32 +185,72 @@ final class AudioManager {
     /// the visualizers react; otherwise it falls back to the system music player.
     func play(mediaItem item: MPMediaItem) {
         nowPlayingTitle = item.title ?? "Unknown Track"
+        errorMessage = nil
 
         // Stop whatever is currently playing on either engine.
         player.stop()
         systemPlayer.stop()
         clearAnalysis()
+        isPlaying = false
 
-        if let url = item.assetURL {
-            do {
-                try player.load(url: url)
-                player.isLooping = false
-                player.play()
-                source = .engine
-                isReactive = true
-                isPlaying = true
-            } catch {
-                errorMessage = "Couldn't load track: \(error.localizedDescription)"
-                isPlaying = false
-            }
-        } else {
-            // DRM-protected Apple Music stream: no audio taps available.
-            systemPlayer.setQueue(with: MPMediaItemCollection(items: [item]))
-            systemPlayer.play()
-            source = .system
-            isReactive = false
-            isPlaying = true
+        // DRM / streaming items have no exportable asset — use the system player.
+        guard let assetURL = item.assetURL, !item.hasProtectedAsset else {
+            playWithSystemPlayer(item)
+            return
         }
+
+        // An MPMediaItem's assetURL is an "ipod-library://" URL, which AVAudioFile
+        // (and therefore AudioKit's AudioPlayer) can't open directly. Export it to
+        // a temporary file the engine can read, then play that so the taps run.
+        isReactive = true
+        isPreparing = true
+
+        let asset = AVURLAsset(url: assetURL)
+        guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            isPreparing = false
+            playWithSystemPlayer(item)
+            return
+        }
+
+        let outURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("m4a")
+
+        Task { @MainActor in
+            do {
+                try await exporter.export(to: outURL, as: .m4a)
+                isPreparing = false
+                loadAndPlayFile(outURL)
+            } catch {
+                isPreparing = false
+                // Fall back to the system player (plays, but no reactivity).
+                playWithSystemPlayer(item)
+            }
+        }
+    }
+
+    private func loadAndPlayFile(_ url: URL) {
+        do {
+            if let old = lastExportURL { try? FileManager.default.removeItem(at: old) }
+            lastExportURL = url
+            try player.load(url: url)
+            player.isLooping = false
+            player.play()
+            source = .engine
+            isReactive = true
+            isPlaying = true
+        } catch {
+            errorMessage = "Couldn't load track: \(error.localizedDescription)"
+            isPlaying = false
+        }
+    }
+
+    private func playWithSystemPlayer(_ item: MPMediaItem) {
+        systemPlayer.setQueue(with: MPMediaItemCollection(items: [item]))
+        systemPlayer.play()
+        source = .system
+        isReactive = false
+        isPlaying = true
     }
 
     private func clearAnalysis() {

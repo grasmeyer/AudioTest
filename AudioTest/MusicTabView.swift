@@ -33,7 +33,11 @@ struct MusicTabView: View {
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
-                        if !audio.isReactive {
+                        if audio.isPreparing {
+                            Text("Preparing…")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        } else if !audio.isReactive {
                             Text("Streaming — visuals won't react")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
