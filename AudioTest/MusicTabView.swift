@@ -33,7 +33,12 @@ struct MusicTabView: View {
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
-                        if audio.isPreparing {
+                        if audio.isMicrophoneActive {
+                            Text("Listening to the room — play music out loud (not on headphones)")
+                                .font(.caption)
+                                .foregroundStyle(.cyan)
+                                .multilineTextAlignment(.center)
+                        } else if audio.isPreparing {
                             Text("Preparing…")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.7))
@@ -84,6 +89,25 @@ struct MusicTabView: View {
                         .background(
                             Capsule()
                                 .fill(Color.pink.opacity(0.55))
+                                .overlay(Capsule().stroke(.white.opacity(0.4), lineWidth: 1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        audio.setMicrophone(active: !audio.isMicrophoneActive)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: audio.isMicrophoneActive ? "mic.slash.fill" : "mic.fill")
+                            Text(audio.isMicrophoneActive ? "Stop Listening" : "Listen (Mic)")
+                        }
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: 240)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule()
+                                .fill(audio.isMicrophoneActive ? Color.orange.opacity(0.75) : Color.blue.opacity(0.55))
                                 .overlay(Capsule().stroke(.white.opacity(0.4), lineWidth: 1))
                         )
                     }

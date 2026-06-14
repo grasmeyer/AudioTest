@@ -21,9 +21,15 @@ final class AudioManager {
     @ObservationIgnored private let systemPlayer = MPMusicPlayerController.applicationMusicPlayer
     @ObservationIgnored private var source: Source = .engine
     @ObservationIgnored private var lastExportURL: URL?
+    // sourceMixer carries whatever is being analyzed (file and/or mic); the tap
+    // chain hangs off it. outputMixer gates the speakers so mic input can be
+    // analyzed without being played back (which would cause feedback).
+    @ObservationIgnored private let sourceMixer: Mixer
     @ObservationIgnored private let waveformMixer: Mixer
     @ObservationIgnored private let mixer: Mixer
     @ObservationIgnored private let pitchMixer: Mixer
+    @ObservationIgnored private let outputMixer: Mixer
+    @ObservationIgnored private var micFader: Mixer?
     @ObservationIgnored private var fftTap: FFTTap?
     @ObservationIgnored private var amplitudeTap: AmplitudeTap?
     @ObservationIgnored private var pitchTap: PitchTap?
@@ -59,6 +65,8 @@ final class AudioManager {
     var isReactive: Bool = true
     // True while a picked track is being exported for AudioKit playback.
     var isPreparing: Bool = false
+    // True while listening to the microphone (room audio) instead of a file.
+    var isMicrophoneActive: Bool = false
 
     private let bufferSize: UInt32 = 4096
     private let waveformBufferSize: UInt32 = 1024
@@ -79,15 +87,17 @@ final class AudioManager {
 
     init() {
         // Each AVAudioNode allows only one tap, so chain Mixers to give every analyzer
-        // its own attachment point.
-        waveformMixer = Mixer(player)
+        // its own attachment point. The mic (added later) feeds sourceMixer too.
+        sourceMixer = Mixer(player)
+        waveformMixer = Mixer(sourceMixer)
         mixer = Mixer(waveformMixer)
         pitchMixer = Mixer(mixer)
+        outputMixer = Mixer(pitchMixer)
         setup()
     }
 
     private func setup() {
-        engine.output = pitchMixer
+        engine.output = outputMixer
 
         guard let url = Bundle.main.url(
             forResource: "melodic-rampb-soul-394784",
@@ -111,7 +121,7 @@ final class AudioManager {
                 sampleRate = Float(format.sampleRate)
             }
 
-            let fft = FFTTap(player, bufferSize: bufferSize) { [weak self] fftData in
+            let fft = FFTTap(sourceMixer, bufferSize: bufferSize) { [weak self] fftData in
                 MainActor.assumeIsolated {
                     self?.process(fftData: fftData)
                 }
@@ -155,11 +165,100 @@ final class AudioManager {
 
     func start() {
         guard !isPlaying else { return }
+        if isMicrophoneActive { stopMicrophone() }
         switch source {
         case .engine: player.play()
         case .system: systemPlayer.play()
         }
         isPlaying = true
+    }
+
+    // MARK: - Microphone (room audio) input
+
+    /// Toggle listening to the microphone so the visuals react to whatever music
+    /// is playing in the room (Spotify, Apple Music, vinyl, etc.) — the only
+    /// DRM-clean way to react to streaming audio on iOS.
+    func setMicrophone(active: Bool) {
+        if active {
+            requestMicAndActivate()
+        } else {
+            stopMicrophone()
+        }
+    }
+
+    private func requestMicAndActivate() {
+        guard !isMicrophoneActive else { return }
+        AVAudioApplication.requestRecordPermission { [weak self] granted in
+            guard let self else { return }
+            Task { @MainActor in
+                if granted {
+                    self.activateMicrophone()
+                } else {
+                    self.errorMessage = "Microphone access was not granted."
+                }
+            }
+        }
+    }
+
+    private func activateMicrophone() {
+        // Stop any file/system playback so only the room audio is analyzed.
+        player.stop()
+        systemPlayer.stop()
+        isPlaying = false
+        clearAnalysis()
+
+        do {
+            engine.stop()
+            // .mixWithOthers keeps other apps (e.g. Spotify) playing while we listen;
+            // .defaultToSpeaker keeps our (muted) output routed to the speaker.
+            try AVAudioSession.sharedInstance().setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .mixWithOthers]
+            )
+            try AVAudioSession.sharedInstance().setActive(true)
+
+            // Connect the mic into the analysis chain the first time it's used.
+            if micFader == nil {
+                guard let input = engine.input else {
+                    errorMessage = "Microphone is unavailable on this device."
+                    try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+                    try? engine.start()
+                    return
+                }
+                let fader = Mixer(input)
+                micFader = fader
+                sourceMixer.addInput(fader)
+            }
+
+            micFader?.volume = 1
+            outputMixer.volume = 0 // mute speakers so the mic doesn't feed back
+
+            try engine.start()
+            isMicrophoneActive = true
+            isReactive = true
+            nowPlayingTitle = "Microphone (room audio)"
+        } catch {
+            errorMessage = "Microphone error: \(error.localizedDescription)"
+            isMicrophoneActive = false
+        }
+    }
+
+    private func stopMicrophone() {
+        guard isMicrophoneActive else { return }
+        do {
+            engine.stop()
+            micFader?.volume = 0
+            outputMixer.volume = 1
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            try engine.start()
+        } catch {
+            errorMessage = "Microphone error: \(error.localizedDescription)"
+        }
+        isMicrophoneActive = false
+        clearAnalysis()
+        nowPlayingTitle = "Default Song"
     }
 
     func stop() {
@@ -184,6 +283,7 @@ final class AudioManager {
     /// accessible audio (downloaded/local/non-DRM), it plays through AudioKit so
     /// the visualizers react; otherwise it falls back to the system music player.
     func play(mediaItem item: MPMediaItem) {
+        if isMicrophoneActive { stopMicrophone() }
         nowPlayingTitle = item.title ?? "Unknown Track"
         errorMessage = nil
 
